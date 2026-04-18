@@ -1,6 +1,15 @@
 const express = require("express");
 const router = express.Router();
+const prisma = require("../lib/prisma");
 const posts = require("../data/posts");
+
+
+function formatPost(post) {
+  return {
+    ...post,
+  };
+}
+
 
 
 router.get("/", (req, res) => {
@@ -18,77 +27,83 @@ router.get("/", (req, res) => {
 });
 
 
-router.get("/:postid", (req, res) => {
-  const postid = Number(req.params.postid);
-
-  const post = posts.find((p) => p.id === postid);
+router.get("/:postId", async (req, res) => {
+  const postId = Number(req.params.postId);
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    include: { keywords: true },
+  });
 
   if (!post) {
-    return res.status(404).json({ message: "Post not found" });
+    return res.status(404).json({ 
+		message: "Post not found" 
+    });
   }
 
-  res.json(post);
+  res.json(formatPost(post));
 });
+
 
 //add
-router.post("/", (req, res) => {
-  const { question, answer, country,} = req.body;
+router.post("/", async (req, res) => {
+  const { question, answer, country} = req.body;
 
   if (!question || !answer || !country) {
-    return res.status(400).json({
-      message: "Question, answer and country are required"
-    });
+    return res.status(400).json({ msg: 
+	"Question,Answer and country are mandatory" });
   }
-  const maxId = Math.max(...posts.map(p => p.id), 0);
 
-  const newPost = {
-    id: posts.length ? maxId + 1 : 1,
-    question, answer, country,
-  };
-  posts.push(newPost);
-  res.status(201).json(newPost);
+  //const keywordsArray = Array.isArray(keywords) ? keywords : [];
+
+  const newPost = await prisma.post.create({
+    data: {
+      question, answer, country,
+      //keywords: {
+        //connectOrCreate: keywordsArray.map((kw) => ({
+          //where: { name: kw }, create: { name: kw },
+        //})), },
+    },
+    //include: { keywords: true },
+  });
+
+  res.status(201).json(formatPost(newPost));
 });
 
+
 //edit
-router.put("/:postId", (req, res) => {
+router.put("/:postId", async (req, res) => {
   const postId = Number(req.params.postId);
-  const { question, answer, country} = req.body || {};;
-
-  const post = posts.find((p) => p.id === postId);
-
-  if (!post) {
+  const { question, answer, country } = req.body;
+  const existingPost = await prisma.post.findUnique({ where: { id: postId } });
+  if (!existingPost) {
     return res.status(404).json({ message: "Post not found" });
   }
 
   if (!question || !answer || !country) {
-    return res.json({
-      message: "question, answer, and country are required"
-    });
+    return res.status(400).json({ msg: "Question,answer and country are mandatory" });
   }
-
-  post.question = question;
-  post.answer = answer;
-  post.country = country;
-
-  res.json(post);
+  res.json(formatPost(updatedPost));
 });
+
 
 //DELETE
 
-router.delete("/:postId", (req, res) => {
+router.delete("/:postId", async (req, res) => {
   const postId = Number(req.params.postId);
 
-  const postIndex = posts.findIndex((p) => p.id === postId);
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+  });
 
-  if (postIndex === -1) {
+  if (!post) {
     return res.status(404).json({ message: "Post not found" });
   }
 
-  const deletedPost = posts.splice(postIndex, 1);
+  await prisma.post.delete({ where: { id: postId } });
 
   res.json({
     message: "Post deleted successfully",
-    post: deletedPost[0]
+    post: formatPost(post),
   });
 });
 
