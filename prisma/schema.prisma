@@ -2,6 +2,15 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id       Int    @id @default(autoincrement())
+  email    String @unique @db.VarChar(255)
+  password String @db.VarChar(255)
+  name     String @db.VarChar(100)
+  posts    Post[]
+}
+
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -12,7 +21,8 @@ model Post {
   question  String    @db.VarChar(255)
   answer     String @db.VarChar(255)
   country  String    @db.Text
+  userId   Int
+  user     User @relation(fields: [userId], references: [id])
 
   @@map("posts")
 }
-

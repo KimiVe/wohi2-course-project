@@ -36,12 +36,24 @@ async function main() {
   await prisma.post.deleteMany();
   await prisma.keyword.deleteMany();
 
+    // Create a default user
+  const hashedPassword = await bcrypt.hash("1234", 10);
+  const user = await prisma.user.create({
+    data: {
+      email: "admin@example.com",
+      password: hashedPassword,
+      name: "Admin User",
+    },
+  });
+
+
   for (const post of seedPosts) {
     await prisma.post.create({
       data: {
         title: post.title,
         date: post.date,
         content: post.content,
+        userId: user.id,
         keywords: {
           connectOrCreate: post.keywords.map((kw) => ({
             where: { name: kw },

@@ -2,7 +2,11 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../lib/prisma");
 const posts = require("../data/posts");
+const authenticate = require("../middleware/auth");
+const isOwner = require("../middleware/isOwner");
 
+
+router.use(authenticate);
 
 function formatPost(post) {
   return {
@@ -45,7 +49,7 @@ router.get("/:postId", async (req, res) => {
 
 
 //add
-router.post("/", async (req, res) => {
+router.post("/", isOwner, async (req, res) => {
   const { question, answer, country} = req.body;
 
   if (!question || !answer || !country) {
@@ -58,6 +62,7 @@ router.post("/", async (req, res) => {
   const newPost = await prisma.post.create({
     data: {
       question, answer, country,
+      userId: req.user.userId,
       //keywords: {
         //connectOrCreate: keywordsArray.map((kw) => ({
           //where: { name: kw }, create: { name: kw },
@@ -71,7 +76,7 @@ router.post("/", async (req, res) => {
 
 
 //edit
-router.put("/:postId", async (req, res) => {
+router.put("/:postId", isOwner, async (req, res) => {
   const postId = Number(req.params.postId);
   const { question, answer, country } = req.body;
   const existingPost = await prisma.post.findUnique({ where: { id: postId } });
@@ -88,7 +93,7 @@ router.put("/:postId", async (req, res) => {
 
 //DELETE
 
-router.delete("/:postId", async (req, res) => {
+router.delete("/:postId", isOwner, async (req, res) => {
   const postId = Number(req.params.postId);
 
   const post = await prisma.post.findUnique({
