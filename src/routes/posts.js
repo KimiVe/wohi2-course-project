@@ -4,6 +4,32 @@ const prisma = require("../lib/prisma");
 const authenticate = require("../middleware/auth");
 const isOwner = require("../middleware/isOwner");
 
+const multer = require("multer");
+
+
+
+
+
+// MULTER
+
+
+
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, "..", "..", "public", "uploads"),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 
 
@@ -15,6 +41,31 @@ const isOwner = require("../middleware/isOwner");
     include: { keywords: true, user: true },
     orderBy: { id: "asc" }
 }); */
+
+// IMAGE POSTS
+
+router.post("/", upload.single("image"), async (req, res) => {
+  const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+  await prisma.post.create({ data: {imageUrl } });
+});
+
+router.put("/:postId", upload.single("image"), isOwner, async (req, res) => {
+  const data = {};
+  
+  await prisma.post.update({ where: { id }, data });
+});
+if (req.file) data.imageUrl = `/uploads/${req.file.filename}`;
+
+
+
+// HELPER keywords
+function parseKeywords(keywords) {
+  if (Array.isArray(keywords)) return keywords;
+  if (typeof keywords === "string") {
+    return keywords.split(",").map((k) => k.trim()).filter(Boolean);
+  }
+  return [];
+//
 
 router.use(authenticate);
 
