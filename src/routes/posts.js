@@ -1,16 +1,34 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../lib/prisma");
-const posts = require("../data/posts");
 const authenticate = require("../middleware/auth");
 const isOwner = require("../middleware/isOwner");
 
+
+
+
+// This throws an error I didn't really get how to fix.
+
+
+/* const posts = await prisma.post.findMany({
+    where,
+    include: { keywords: true, user: true },
+    orderBy: { id: "asc" }
+}); */
 
 router.use(authenticate);
 
 function formatPost(post) {
   return {
     ...post,
+    date: post.date.toISOString().split("T")[0],
+    keywords: post.keywords.map((k) => k.name),
+    userName: post.user?.name || null,
+    likeCount: post._count?.likes ?? 0,
+    liked: post.likes ? post.likes.length > 0 : false,
+    user: undefined,
+    likes: undefined,
+    _count: undefined,
   };
 }
 
@@ -28,24 +46,32 @@ router.get("/", (req, res) => {
   );
 
   res.json(filteredPosts);
+
+
+  //const page;
+  //const limit;
+  //const skip;
 });
 
 
 router.get("/:postId", async (req, res) => {
-  const postId = Number(req.params.postId);
-  const post = await prisma.post.findUnique({
-    where: { id: postId },
-    include: { keywords: true },
-  });
-
-  if (!post) {
-    return res.status(404).json({ 
-		message: "Post not found" 
+    const postId = Number(req.params.postId);
+    const post = await prisma.post.findUnique({
+        where: { id: postId },
+        include: {
+            keywords: true,
+            user: true,
+            likes: { where: { userId: req.user.userId }, take: 1 },
+            _count: { select: { likes: true } },
+        },
     });
-  }
 
-  res.json(formatPost(post));
+    if (!post) {
+        return res.status(404).json({message: "Post not found"});
+    }
+    res.json(formatPost(post));
 });
+
 
 
 //add
@@ -112,5 +138,55 @@ router.delete("/:postId", isOwner, async (req, res) => {
   });
 });
 
+// like endpoint 
+
+
+router.post("/:postId/like", async (req, res) => {
+    const postId = Number(req.params.postId);
+
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+    }
+
+    const like = await prisma.like.upsert({
+        where: { userId_postId: { userId: req.user.userId, postId } },
+        update: {},
+        create: { userId: req.user.userId, postId },
+    });
+
+    const likeCount = await prisma.like.count({ where: { postId } });
+
+    res.status(201).json({
+        id: like.id,
+        postId,
+        liked: true,
+        likeCount,
+        createdAt: like.createdAt,
+    });
+});
+
+
+
+// unlike endpoint
+router.delete("/:postId/like", async (req, res) => {
+    const postId = Number(req.params.postId);
+
+    const post = await prisma.post.findUnique({ where: { id: postId } });
+    if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+    }
+
+    await prisma.like.deleteMany({
+        where: { userId: req.user.userId, postId },
+    });
+
+    const likeCount = await prisma.like.count({ where: { postId } });
+
+    res.json({ postId, liked: false, likeCount });
+});
+
 
 module.exports = router;
+
+

@@ -8,8 +8,8 @@ model User {
   password String @db.VarChar(255)
   name     String @db.VarChar(100)
   posts    Post[]
+  likes    Like[]
 }
-
 
 datasource db {
   provider = "mysql"
@@ -17,12 +17,25 @@ datasource db {
 }
 
 model Post {
-  id       Int       @id @default(autoincrement())
-  question  String    @db.VarChar(255)
-  answer     String @db.VarChar(255)
-  country  String    @db.Text
+  id       Int    @id @default(autoincrement())
+  question String @db.VarChar(255)
+  answer   String @db.VarChar(255)
+  country  String @db.Text
   userId   Int
-  user     User @relation(fields: [userId], references: [id])
+  user     User   @relation(fields: [userId], references: [id])
+  likes    Like[]
 
   @@map("posts")
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  postId    Int
+  posts     Post     @relation(fields: [postId], references: [id])
+
+  @@unique([userId, postId])
+  @@map("likes")
 }
