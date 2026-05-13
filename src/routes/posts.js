@@ -8,6 +8,32 @@ const multer = require("multer");
 
 
 
+//ZOD
+
+
+const { z } = require("zod");
+
+const PostInput = z.object({
+  title: z.string().min(1),
+  date: z.string().date(),
+  content: z.string().min(1),
+  keywords: z.union([z.string(), z.array(z.string())]).optional(),
+});
+
+router.post("/", upload.single("image"), async (req, res) => {
+  const data = PostInput.parse(req.body); // throws ZodError on failure
+  // ...rest unchanged, using `data.title` etc.
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError ||
+      err?.message === "Only image files are allowed") {
+    return res.status(400).json({ msg: err.message });
+  }
+  next(err); // pass through to global handler
+});
+
+
 
 
 // MULTER
@@ -24,10 +50,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) cb(null, true);
-    else cb(new Error("Only image files are allowed"));
-  },
+fileFilter: (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) cb(null, true);
+  else cb(new ValidationError("Only image files are allowed"));
+},
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
@@ -58,13 +84,24 @@ if (req.file) data.imageUrl = `/uploads/${req.file.filename}`;
 
 
 
-// HELPER keywords
+// HELPER KEYWORDS
 function parseKeywords(keywords) {
   if (Array.isArray(keywords)) return keywords;
   if (typeof keywords === "string") {
     return keywords.split(",").map((k) => k.trim()).filter(Boolean);
   }
   return [];
+}
+
+router.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError ||
+        err?.message === "Only image files are allowed") {
+        return res.status(400).json({ msg: err.message });
+    }
+    next(err);
+});
+
+
 //
 
 router.use(authenticate);
